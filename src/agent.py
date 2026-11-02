@@ -56,40 +56,35 @@ You are the AI customer support assistant for Empório da Música,
 a musical instrument store in Campo Grande, Brazil.
 
 Always respond in Brazilian Portuguese.
-Use a friendly, professional and concise tone.
+Be friendly, professional and concise.
 
-You have two tools:
+Use check_catalog for prices, products and stock.
+Use get_store_policy for opening hours, address, payment,
+returns, exchanges, delivery and warranties.
 
-1. check_catalog:
-Use it for product prices, categories and stock availability.
-Never invent product names, prices or stock quantities.
+Always consult tools before giving factual answers.
+Use the customer's question when searching store policies.
+Never invent prices, stock quantities or store policies.
 
-2. get_store_policy:
-Use it for opening hours, store address, payments, returns,
-exchanges, refunds, delivery and warranties.
-Pass the customer's question as the topic argument.
-Never invent store policies.
+Keep track of the conversation context.
+Understand follow-up questions using previous messages.
+Consult the appropriate tool again when new facts are needed.
 
-Always consult the appropriate tool before answering
-questions about products or store policies.
+If the information is unavailable, explain the limitation
+and suggest contacting a human attendant.
 
-Base factual answers only on information returned by tools.
+Do not access or disclose customer records.
+Order status lookup is not implemented yet.
 
-If information is unavailable, explain the limitation
-and recommend contacting a human attendant.
-
-Do not pretend to check order status or access customer
-records because those capabilities are not implemented yet.
-
-Do not claim to complete reservations, refunds, purchases,
-order changes or any other transaction.
+Never claim to complete purchases, reservations,
+refunds, order changes or deliveries.
 
 Politely redirect questions unrelated to the store.
 """
 
 
-def ask_agent(question: str) -> str:
-    """Answer a customer question using Gemini and available tools."""
+def create_chat():
+    """Create a conversation with tools and session history."""
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
@@ -99,28 +94,31 @@ def ask_agent(question: str) -> str:
 
     client = genai.Client(api_key=api_key)
 
-    response = client.models.generate_content(
+    chat = client.chats.create(
         model=MODEL_NAME,
-        contents=question,
         config=types.GenerateContentConfig(
-            tools=[
-                check_catalog,
-                get_store_policy
-            ],
+            tools=[check_catalog, get_store_policy],
             system_instruction=SYSTEM_PROMPT,
             temperature=0.1
         )
     )
 
-    return response.text or (
-        "Desculpe, não consegui gerar uma resposta."
-    )
+    return chat
 
 
 def main():
-    """Run the command-line customer support agent."""
+    """Run the interactive customer support conversation."""
     print("Empório da Música | AI Customer Support")
     print("Digite 'sair' para encerrar.\n")
+
+    try:
+        chat = create_chat()
+    except Exception as error:
+        print(
+            f"Could not initialize agent: "
+            f"{type(error).__name__}"
+        )
+        return
 
     while True:
         try:
@@ -138,13 +136,18 @@ def main():
             continue
 
         try:
-            answer = ask_agent(question)
+            response = chat.send_message(question)
+
+            answer = response.text or (
+                "Desculpe, não consegui responder."
+            )
+
             print(f"\nAssistente: {answer}\n")
 
         except Exception as error:
             print(
                 f"\nErro: {type(error).__name__}. "
-                "Verifique a configuração e tente novamente.\n"
+                "Tente novamente ou contate um atendente.\n"
             )
 
 
