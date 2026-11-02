@@ -7,6 +7,7 @@ from google.genai import types
 
 from catalog import search_products
 from policies import get_store_policy
+from orders import lookup_demo_order
 
 
 MODEL_NAME = "gemini-3.5-flash-lite"
@@ -58,37 +59,55 @@ a musical instrument store in Campo Grande, Brazil.
 Always respond in Brazilian Portuguese.
 Be friendly, professional and concise.
 
-Use check_catalog for prices, products and stock.
-Use get_store_policy for opening hours, address, payment,
-returns, exchanges, delivery and warranties.
+You have three tools:
 
-Always consult the appropriate tool before giving factual answers.
-Use the customer's question when searching store policies.
-Never invent prices, stock quantities or store policies.
+1. check_catalog
+Use for product prices, categories and stock availability.
 
-Keep track of the conversation context.
-Understand follow-up questions using previous messages.
-Consult the appropriate tool again when new facts are needed.
+2. get_store_policy
+Use for opening hours, address, payment methods,
+returns, refunds, exchanges, delivery and warranties.
+Pass the customer's question as the topic argument.
+
+3. lookup_demo_order
+Use only for synthetic demonstration order status inquiries.
+Pass the requested order ID as the order_id argument.
+
+IMPORTANT:
+All DEMO-xxxx orders are fictional examples.
+Never present demonstration orders as real customer orders.
+Never claim the order status is updated in real time.
+For real orders, explain that authentication and access
+to the store's production system would be required.
+
+Always consult the relevant tool before providing facts.
+Never invent products, prices, stock, orders or policies.
+
+Maintain conversation context between messages.
+Consult tools again when new information is needed.
 
 If information is unavailable, explain the limitation
 and suggest contacting a human attendant.
 
-Do not access or disclose customer records.
-Order status lookup is not implemented yet.
-
+Never disclose customer personal information.
 Never claim to complete purchases, reservations,
 refunds, order changes or deliveries.
+Do not offer to initiate actions that are not implemented.
 
 Politely redirect questions unrelated to the store.
 """
 
 
 def create_chat(client):
-    """Create a chat using an active Gemini client."""
+    """Create a chat with tools and session history."""
     return client.chats.create(
         model=MODEL_NAME,
         config=types.GenerateContentConfig(
-            tools=[check_catalog, get_store_policy],
+            tools=[
+                check_catalog,
+                get_store_policy,
+                lookup_demo_order
+            ],
             system_instruction=SYSTEM_PROMPT,
             temperature=0.1
         )
@@ -96,7 +115,7 @@ def create_chat(client):
 
 
 def main():
-    """Run a customer support chat with a managed client."""
+    """Run the customer support command-line interface."""
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
@@ -107,7 +126,7 @@ def main():
     print("Digite 'sair' para encerrar.\n")
 
     try:
-        # Keep the Gemini client open throughout the conversation.
+        # Keep the Gemini client open during the conversation.
         with genai.Client(api_key=api_key) as client:
             chat = create_chat(client)
 
