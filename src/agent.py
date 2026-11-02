@@ -62,7 +62,7 @@ Use check_catalog for prices, products and stock.
 Use get_store_policy for opening hours, address, payment,
 returns, exchanges, delivery and warranties.
 
-Always consult tools before giving factual answers.
+Always consult the appropriate tool before giving factual answers.
 Use the customer's question when searching store policies.
 Never invent prices, stock quantities or store policies.
 
@@ -70,7 +70,7 @@ Keep track of the conversation context.
 Understand follow-up questions using previous messages.
 Consult the appropriate tool again when new facts are needed.
 
-If the information is unavailable, explain the limitation
+If information is unavailable, explain the limitation
 and suggest contacting a human attendant.
 
 Do not access or disclose customer records.
@@ -83,18 +83,9 @@ Politely redirect questions unrelated to the store.
 """
 
 
-def create_chat():
-    """Create a conversation with tools and session history."""
-    api_key = os.getenv("GEMINI_API_KEY")
-
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY environment variable is missing."
-        )
-
-    client = genai.Client(api_key=api_key)
-
-    chat = client.chats.create(
+def create_chat(client):
+    """Create a chat using an active Gemini client."""
+    return client.chats.create(
         model=MODEL_NAME,
         config=types.GenerateContentConfig(
             tools=[check_catalog, get_store_policy],
@@ -103,52 +94,58 @@ def create_chat():
         )
     )
 
-    return chat
-
 
 def main():
-    """Run the interactive customer support conversation."""
+    """Run a customer support chat with a managed client."""
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        print("Error: GEMINI_API_KEY is not configured.")
+        return
+
     print("Empório da Música | AI Customer Support")
     print("Digite 'sair' para encerrar.\n")
 
     try:
-        chat = create_chat()
+        # Keep the Gemini client open throughout the conversation.
+        with genai.Client(api_key=api_key) as client:
+            chat = create_chat(client)
+
+            while True:
+                try:
+                    question = input("Você: ").strip()
+
+                except (EOFError, KeyboardInterrupt):
+                    print("\nAtendimento encerrado.")
+                    break
+
+                if question.lower() in {"sair", "exit", "quit"}:
+                    print("Atendimento encerrado.")
+                    break
+
+                if not question:
+                    continue
+
+                try:
+                    response = chat.send_message(question)
+
+                    answer = response.text or (
+                        "Desculpe, não consegui responder."
+                    )
+
+                    print(f"\nAssistente: {answer}\n")
+
+                except Exception as error:
+                    print(
+                        f"\nErro: {type(error).__name__}. "
+                        "Tente novamente ou contate um atendente.\n"
+                    )
+
     except Exception as error:
         print(
-            f"Could not initialize agent: "
+            f"Could not initialize Gemini: "
             f"{type(error).__name__}"
         )
-        return
-
-    while True:
-        try:
-            question = input("Você: ").strip()
-
-        except (EOFError, KeyboardInterrupt):
-            print("\nAtendimento encerrado.")
-            break
-
-        if question.lower() in {"sair", "exit", "quit"}:
-            print("Atendimento encerrado.")
-            break
-
-        if not question:
-            continue
-
-        try:
-            response = chat.send_message(question)
-
-            answer = response.text or (
-                "Desculpe, não consegui responder."
-            )
-
-            print(f"\nAssistente: {answer}\n")
-
-        except Exception as error:
-            print(
-                f"\nErro: {type(error).__name__}. "
-                "Tente novamente ou contate um atendente.\n"
-            )
 
 
 if __name__ == "__main__":
